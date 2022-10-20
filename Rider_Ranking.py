@@ -48,29 +48,35 @@ def get_tesing_get_send_address(cursor, num_of_testing_instance):
     return records
 
 
-def ranker_1(row):
+def ranker_1(row, cursor, ref_rank, compare_rank):
     get_address = row["get_address"]
     send_address = row["send_address"]
-    search_query = f"SELECT `GET_EMPLOYEE_CODE`, `count`, `min_time_diff` FROM `RMP_Rider_Get_Min_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `count` DESC"
+    search_query = f"SELECT `min_time_diff` FROM `RMP_Rider_Get_Min_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `count` DESC"
     print(search_query)
-    # print("The class is %s" % row["get_address"])
+    records = query_DB(cursor, search_query)
+    time_diff=records[compare_rank][0]-records[ref_rank][0]
+    print(f"時間差={time_diff}")
+    return time_diff
 
 
 if __name__ == '__main__':
+    # Setting
     connection, cursor = connet_DB()
-    send_address = "新竹市東區新莊街230號"
-    arrival_address = "新竹縣寶山鄉創新一路13號"
+    num_of_testing_instance = 1
+    ref_rank=0
+    compare_rank=1
+    ##############
     testing_address = []
     # query top 100 get and send address for testing
-    records = get_tesing_get_send_address(cursor, 100)
+    records = get_tesing_get_send_address(cursor, num_of_testing_instance)
     for (get_address, send_address) in records:
         # print("get_address: %s, send_address: %s" % (get_address, send_address))
         testing_address.append([get_address, send_address])
     df_testing_address = pd.DataFrame(testing_address)
     df_testing_address.columns = ["get_address", "send_address"]
     # print(df_testing_address)
-    df_testing_address.apply(ranker_1, axis=1)
-
+    ds=df_testing_address.apply(ranker_1, axis=1, args=(cursor, ref_rank, compare_rank)) # https://ithelp.ithome.com.tw/articles/10268716, https://www.digitalocean.com/community/tutorials/pandas-dataframe-apply-examples
+    print(ds)
     # search_query="SELECT `GET_EMPLOYEE_CODE`, `count`, `min_time_diff` FROM `RMP_Rider_Get_Min_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '新竹市東區新莊街230號' AND `SEND_ADDRESS_2_sub` LIKE '新竹縣寶山鄉創新一路13號' ORDER BY `count` DESC"
     # # 列出查詢的資料
     # records=query_DB(cursor, search_query)
