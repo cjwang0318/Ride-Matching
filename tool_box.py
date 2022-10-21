@@ -103,7 +103,8 @@ def check_item_in_list(str, list):
             result = target
     return result
 
-
+def test():
+    print("test")
 # test area
 # a="Type-(I) 2.48"
 # print(replace_punctuation(a))
