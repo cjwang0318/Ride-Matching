@@ -2,7 +2,6 @@ import mysql.connector
 from mysql.connector import Error
 import pandas as pd
 
-
 def connet_DB():
     try:
         # 連接 MySQL/MariaDB 資料庫
@@ -37,7 +36,7 @@ def query_DB(cursor, query):
     cursor.execute(query)
     # 取回全部的資料
     records = cursor.fetchall()
-    print("成功查詢，資料筆數：", cursor.rowcount)
+    #print("成功查詢，資料筆數：", cursor.rowcount)
     return records
 
 
@@ -48,23 +47,38 @@ def get_tesing_get_send_address(cursor, num_of_testing_instance):
     return records
 
 
-def ranker_1(row, cursor, ref_rank, compare_rank):
+def ranker_max_count(row, cursor, rank, filter_speed):
     get_address = row["get_address"]
     send_address = row["send_address"]
-    search_query = f"SELECT `min_time_diff` FROM `RMP_Rider_Get_Min_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `count` DESC"
-    print(search_query)
+    search_query = f"SELECT `min_time_diff`, `speed` FROM `RMP_Rider_Get_Min_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `count` DESC"
+    #print(search_query)
     records = query_DB(cursor, search_query)
-    time_diff=records[compare_rank][0]-records[ref_rank][0]
-    print(f"時間差={time_diff}")
-    return time_diff
+    for (min_time_diff, speed) in records:
+        if float(speed) < filter_speed:
+            first_time = min_time_diff
+            break
+    # print(first_time)
+    search_query = f"SELECT `time_diff` FROM `RMP_Rider_Get_Send_Time_After_2022` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}'"
+    records = query_DB(cursor, search_query)
+    num_of_testing_data = len(records)
+    time_sum_of_ranker = first_time * num_of_testing_data
+    time_sum_of_testing_data = 0
+    for (time_diff) in records:
+        time_sum_of_testing_data = time_sum_of_testing_data + time_diff[0]
+    improved_time = time_sum_of_testing_data - time_sum_of_ranker
+    improved_ratio = improved_time / time_sum_of_testing_data
+    print(
+        f"取件地址={get_address}; 配送地址={send_address}; 測試資料數量={num_of_testing_data}; 提升率={format(improved_ratio, '.4f')}")
+    #return improved_ratio
+    return  pd.Series([improved_ratio, num_of_testing_data])
 
 
 if __name__ == '__main__':
     # Setting
     connection, cursor = connet_DB()
-    num_of_testing_instance = 1
-    ref_rank=0
-    compare_rank=1
+    num_of_testing_instance = 2
+    ref_rank = 0  # 如果比較對像是取件次數最多騎手就設定0，第二多的就設定1，依此類推...
+    filter_speed = 100  # 設定排除速度，如果速度大於此閥值就排除計算
     ##############
     testing_address = []
     # query top 100 get and send address for testing
@@ -74,12 +88,11 @@ if __name__ == '__main__':
         testing_address.append([get_address, send_address])
     df_testing_address = pd.DataFrame(testing_address)
     df_testing_address.columns = ["get_address", "send_address"]
-    # print(df_testing_address)
-    ds=df_testing_address.apply(ranker_1, axis=1, args=(cursor, ref_rank, compare_rank)) # https://ithelp.ithome.com.tw/articles/10268716, https://www.digitalocean.com/community/tutorials/pandas-dataframe-apply-examples
-    print(ds)
-    # search_query="SELECT `GET_EMPLOYEE_CODE`, `count`, `min_time_diff` FROM `RMP_Rider_Get_Min_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '新竹市東區新莊街230號' AND `SEND_ADDRESS_2_sub` LIKE '新竹縣寶山鄉創新一路13號' ORDER BY `count` DESC"
-    # # 列出查詢的資料
-    # records=query_DB(cursor, search_query)
-    # for (employee_code, count, min_time_diff) in records:
-    #     print("employee_code: %s, count: %d, min_time_diff: %d" % (employee_code, count, min_time_diff))
+    result_df = df_testing_address.apply(ranker_max_count, axis=1, args=(cursor,
+                                                                        ref_rank,
+                                                                        filter_speed))  # https://ithelp.ithome.com.tw/articles/10268716, https://www.digitalocean.com/community/tutorials/pandas-dataframe-apply-examples
+    result_df.columns = ["improved_ratio", "num_of_testing_data"]
+    average_improved_ratio = format(result_df["improved_ratio"].mean(), '.4f')
+    sum_of_testing_data=format(result_df["num_of_testing_data"].sum(), '.0f')
+    print(f"測試資料數量={sum_of_testing_data}; 平均提升率={average_improved_ratio}")
     close_DB(connection, cursor)
