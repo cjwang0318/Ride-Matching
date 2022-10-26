@@ -104,7 +104,7 @@ if __name__ == '__main__':
     # Setting
     connection, cursor = connet_DB()
     num_of_testing_instance = 10
-    ref_rank = 3  # 排序對應索引，如果比較對像是取件次數最多騎手就設定1，第二多的就設定2，依此類推...，也就是如果設定"2"，取件次數最多的騎手就會不會被列入比較
+    ref_rank = 1  # 排序對應索引，如果比較對像是取件次數最多騎手就設定1，第二多的就設定2，依此類推...，也就是如果設定"2"，取件次數最多的騎手就會不會被列入比較
     filter_speed = 100  # 設定排除速度，如果速度大於此閥值就排除計算
     ##############
     testing_address = []
@@ -123,4 +123,5 @@ if __name__ == '__main__':
     sum_of_testing_data = format(result_df["num_of_testing_data"].sum(), '.0f')
     print(f"測試資料數量={sum_of_testing_data}; 平均提升率={average_improved_ratio}")
     # print(result_df)
+    result_df.to_csv("output.csv")
     close_DB(connection, cursor)
