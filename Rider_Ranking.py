@@ -66,6 +66,8 @@ def get_tesing_get_send_address(cursor, num_of_testing_instance):
 def ranker_max_count(row, cursor, ref_rank, filter_speed):
     get_address = row["get_address"]
     send_address = row["send_address"]
+    # get_address = "新竹市東區忠孝路300號"
+    # send_address = "新竹市東區龍山東路228號"
     search_query = f"SELECT `min_time_diff`, `speed` FROM `RMP_Rider_Get_Min_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `count` DESC"
     # print(search_query)
     first_time = 0
@@ -82,14 +84,15 @@ def ranker_max_count(row, cursor, ref_rank, filter_speed):
         print(f"錯誤：取件地址={get_address}; 配送地址={send_address}\t不符合測試條件")
         return pd.Series([None, None])
     # print(first_time)
-    search_query = f"SELECT `time_diff` FROM `RMP_Rider_Get_Send_Time_After_2022` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}'"
+    search_query = f"SELECT `time_diff`, `speed` FROM `RMP_Rider_Get_Send_Time_After_2022` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}'"
     records = query_DB(cursor, search_query)
     num_of_testing_data = len(records)
     time_sum_of_ranker = first_time * num_of_testing_data
     time_sum_of_testing_data = 0
-    for (time_diff) in records:
-        time_sum_of_testing_data = time_sum_of_testing_data + time_diff[0]
-    if len(records) == 0:
+    for (time_diff, speed) in records:
+        if is_number(speed) and float(speed) < filter_speed:
+            time_sum_of_testing_data = time_sum_of_testing_data + time_diff
+    if len(records) == 0 or time_sum_of_testing_data == 0:
         print(f"錯誤：取件地址={get_address}; 配送地址={send_address}\t不符合測試條件")
         return pd.Series([None, None])
     improved_time = time_sum_of_testing_data - time_sum_of_ranker
@@ -103,8 +106,8 @@ def ranker_max_count(row, cursor, ref_rank, filter_speed):
 if __name__ == '__main__':
     # Setting
     connection, cursor = connet_DB()
-    num_of_testing_instance = 10
-    ref_rank = 1  # 排序對應索引，如果比較對像是取件次數最多騎手就設定1，第二多的就設定2，依此類推...，也就是如果設定"2"，取件次數最多的騎手就會不會被列入比較
+    num_of_testing_instance = 100
+    ref_rank = 5  # 排序對應索引，如果比較對像是取件次數最多騎手就設定1，第二多的就設定2，依此類推...，也就是如果設定"2"，取件次數最多的騎手就會不會被列入比較
     filter_speed = 100  # 設定排除速度，如果速度大於此閥值就排除計算
     ##############
     testing_address = []
