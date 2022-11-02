@@ -63,22 +63,25 @@ def get_tesing_get_send_address(cursor, num_of_testing_instance):
     return records
 
 
-def ranker_max_count(row, cursor, ref_rank, filter_speed):
+def ranker_max_count(row, cursor, ref_rank, filter_speed, time_type):
     get_address = row["get_address"]
     send_address = row["send_address"]
     # get_address = "新竹市東區忠孝路300號"
     # send_address = "新竹市東區龍山東路228號"
-    search_query = f"SELECT `min_time_diff`, `speed` FROM `RMP_Rider_Get_Min_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `count` DESC"
+    if (time_type == "min"):
+        search_query = f"SELECT `time_diff`, `speed` FROM `RMP_Rider_Get_Min_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `count` DESC"
+    else:
+        search_query = f"SELECT `time_diff`, `speed` FROM `RMP_Rider_Get_AVG_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `count` DESC"
     # print(search_query)
     first_time = 0
-    count = 0
+    count = 1
     records = query_DB(cursor, search_query)
-    for (min_time_diff, speed) in records:
+    for (time_diff, speed) in records:
         if count < ref_rank:
             count = count + 1
             continue
         if is_number(speed) and float(speed) < filter_speed:
-            first_time = min_time_diff
+            first_time = float(time_diff)
             break
     if (first_time == 0):
         print(f"錯誤：取件地址={get_address}; 配送地址={send_address}\t不符合測試條件")
@@ -100,15 +103,16 @@ def ranker_max_count(row, cursor, ref_rank, filter_speed):
     print(
         f"取件地址={get_address}; 配送地址={send_address}; 測試資料數量={num_of_testing_data}; 提升率={format(improved_ratio, '.4f')}")
     # return improved_ratio
-    return pd.Series([improved_ratio, num_of_testing_data])
+    return pd.Series([num_of_testing_data, time_sum_of_testing_data, time_sum_of_ranker, improved_ratio])
 
 
 if __name__ == '__main__':
     # Setting
     connection, cursor = connet_DB()
     num_of_testing_instance = 100
-    ref_rank = 5  # 排序對應索引，如果比較對像是取件次數最多騎手就設定1，第二多的就設定2，依此類推...，也就是如果設定"2"，取件次數最多的騎手就會不會被列入比較
+    ref_rank = 2  # 排序對應索引，如果比較對像是取件次數最多騎手就設定1，第二多的就設定2，依此類推...，也就是如果設定"2"，取件次數最多的騎手就會不會被列入比較
     filter_speed = 100  # 設定排除速度，如果速度大於此閥值就排除計算
+    time_type = "avg"  # 計算時間的方式： min or avg
     ##############
     testing_address = []
     # query top 100 get and send address for testing
@@ -120,11 +124,28 @@ if __name__ == '__main__':
     df_testing_address.columns = ["get_address", "send_address"]
     result_df = df_testing_address.apply(ranker_max_count, axis=1, args=(cursor,
                                                                          ref_rank,
-                                                                         filter_speed))  # https://ithelp.ithome.com.tw/articles/10268716, https://www.digitalocean.com/community/tutorials/pandas-dataframe-apply-examples
-    result_df.columns = ["improved_ratio", "num_of_testing_data"]
-    average_improved_ratio = format(result_df["improved_ratio"].mean(), '.4f')
-    sum_of_testing_data = format(result_df["num_of_testing_data"].sum(), '.0f')
-    print(f"測試資料數量={sum_of_testing_data}; 平均提升率={average_improved_ratio}")
+                                                                         filter_speed,
+                                                                         time_type))  # https://ithelp.ithome.com.tw/articles/10268716, https://www.digitalocean.com/community/tutorials/pandas-dataframe-apply-examples
+    result_df.columns = ["num_of_testing_data", "time_sum_of_testing_data", "time_sum_of_ranker", "improved_ratio"]
+    # average_improved_ratio = format(result_df["improved_ratio"].mean(), '.4f')
+    # 計算測試資料數量
+    sum_of_testing_data = result_df["num_of_testing_data"].sum()
+    # 計算測試資料配送總共花費秒數
+    time_sum_of_testing_data = result_df["time_sum_of_testing_data"].sum()
+    time_sum_of_ranker = result_df["time_sum_of_ranker"].sum()
+    # 計算測試資料提升率
+    improved_time = time_sum_of_testing_data - time_sum_of_ranker
+    average_improved_ratio = improved_time / time_sum_of_testing_data
+    total_save_time = time_sum_of_testing_data - time_sum_of_ranker
+    average_save_time_for_each_request = total_save_time / sum_of_testing_data
+    sum_of_testing_data = format(sum_of_testing_data, '.0f')
+    time_sum_of_testing_data = format(time_sum_of_testing_data, '.0f')
+    time_sum_of_ranker = format(time_sum_of_ranker, '.0f')
+    average_improved_ratio = format(average_improved_ratio, '.4f')
+    print(
+        f"測試資料數量={sum_of_testing_data}; 全球騎手使用秒數={time_sum_of_testing_data}; 工研院調派騎手使用秒數={time_sum_of_ranker}; 平均提升率={average_improved_ratio}")
+    print(
+        f"工研院調派系統: 全部節省時間(秒){format(total_save_time, '.0f')}; 平均每定單節單時間(秒){format(average_save_time_for_each_request, '.0f')}")
     # print(result_df)
     result_df.to_csv("output.csv")
     close_DB(connection, cursor)
