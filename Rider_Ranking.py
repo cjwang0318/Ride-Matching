@@ -1,6 +1,7 @@
 import mysql.connector
 from mysql.connector import Error
 import pandas as pd
+import os
 
 
 def connet_DB():
@@ -63,15 +64,18 @@ def get_tesing_get_send_address(cursor, num_of_testing_instance):
     return records
 
 
-def ranker_max_count(row, cursor, ref_rank, filter_speed, time_type):
+def ranker_max_count(row, cursor, ref_rank, filter_speed, search_type):
     get_address = row["get_address"]
     send_address = row["send_address"]
-    # get_address = "新竹市東區忠孝路300號"
-    # send_address = "新竹市東區龍山東路228號"
-    if (time_type == "min"):
+    if (search_type == "count_min"):
         search_query = f"SELECT `time_diff`, `speed` FROM `RMP_Rider_Get_Min_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `count` DESC"
-    else:
+    elif (search_type == "count_avg"):
         search_query = f"SELECT `time_diff`, `speed` FROM `RMP_Rider_Get_AVG_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `count` DESC"
+    elif (search_type == "speed_avg"):
+        search_query = f"SELECT `time_diff`, `speed` FROM `RMP_Rider_Get_AVG_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `speed` DESC"
+    else:
+        print("SQL查詢詞錯誤")
+        os._exit()
     # print(search_query)
     first_time = 0
     count = 1
@@ -109,10 +113,10 @@ def ranker_max_count(row, cursor, ref_rank, filter_speed, time_type):
 if __name__ == '__main__':
     # Setting
     connection, cursor = connet_DB()
-    num_of_testing_instance = 100
-    ref_rank = 2  # 排序對應索引，如果比較對像是取件次數最多騎手就設定1，第二多的就設定2，依此類推...，也就是如果設定"2"，取件次數最多的騎手就會不會被列入比較
+    num_of_testing_instance = 10
+    ref_rank = 1  # 排序對應索引，如果比較對像是取件次數最多騎手就設定1，第二多的就設定2，依此類推...，也就是如果設定"2"，取件次數最多的騎手就會不會被列入比較
     filter_speed = 100  # 設定排除速度，如果速度大於此閥值就排除計算
-    time_type = "avg"  # 計算時間的方式： min or avg
+    search_type = "speed_avg"  # 排序使用的模型： count_min or count_avg or speed_avg, count表示使用次數排序, speed表示使用速度排序, avg表示使用平均值當配送時間, min表示使用最小值當配送時間
     ##############
     testing_address = []
     # query top 100 get and send address for testing
@@ -125,7 +129,7 @@ if __name__ == '__main__':
     result_df = df_testing_address.apply(ranker_max_count, axis=1, args=(cursor,
                                                                          ref_rank,
                                                                          filter_speed,
-                                                                         time_type))  # https://ithelp.ithome.com.tw/articles/10268716, https://www.digitalocean.com/community/tutorials/pandas-dataframe-apply-examples
+                                                                         search_type))  # https://ithelp.ithome.com.tw/articles/10268716, https://www.digitalocean.com/community/tutorials/pandas-dataframe-apply-examples
     result_df.columns = ["num_of_testing_data", "time_sum_of_testing_data", "time_sum_of_ranker", "improved_ratio"]
     # average_improved_ratio = format(result_df["improved_ratio"].mean(), '.4f')
     # 計算測試資料數量
