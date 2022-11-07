@@ -73,6 +73,8 @@ def ranker_max_count(row, cursor, ref_rank, filter_speed, search_type):
         search_query = f"SELECT `time_diff`, `speed` FROM `RMP_Rider_Get_AVG_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `count` DESC"
     elif (search_type == "speed_avg"):
         search_query = f"SELECT `time_diff`, `speed` FROM `RMP_Rider_Get_AVG_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `speed` DESC"
+    elif (search_type == "order_avg"):
+        search_query = f"SELECT `time_diff`, `speed` FROM `RMP_Rider_Get_AVG_TimeDiff` WHERE `GET_ADDRESS_2_sub` LIKE '{get_address}' AND `SEND_ADDRESS_2_sub` LIKE '{send_address}' ORDER BY `Order_Count` DESC"
     else:
         print("SQL查詢詞錯誤")
         os._exit()
@@ -114,9 +116,9 @@ if __name__ == '__main__':
     # Setting
     connection, cursor = connet_DB()
     num_of_testing_instance = 10
-    ref_rank = 1  # 排序對應索引，如果比較對像是取件次數最多騎手就設定1，第二多的就設定2，依此類推...，也就是如果設定"2"，取件次數最多的騎手就會不會被列入比較
+    ref_rank = 5  # 排序對應索引，如果比較對像是取件次數最多騎手就設定1，第二多的就設定2，依此類推...，也就是如果設定"2"，取件次數最多的騎手就會不會被列入比較
     filter_speed = 100  # 設定排除速度，如果速度大於此閥值就排除計算
-    search_type = "speed_avg"  # 排序使用的模型： count_min or count_avg or speed_avg, count表示使用次數排序, speed表示使用速度排序, avg表示使用平均值當配送時間, min表示使用最小值當配送時間
+    search_type = "order_avg"  # 排序使用的模型： count_min or count_avg or speed_avg, count表示使用次數排序, speed表示使用速度排序, avg表示使用平均值當配送時間, min表示使用最小值當配送時間
     ##############
     testing_address = []
     # query top 100 get and send address for testing
